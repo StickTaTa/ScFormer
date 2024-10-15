@@ -38,15 +38,18 @@ for downstream tasks such as clustering and classification.
     source env/bin/activate  # On Windows: env\Scripts\activate
     ```
 
-3. **Install Dependencies**
-    ```bash
-    pip install -r requirements.txt
-    ```
+3. **Install Dependencies**: You can check the dependencies and their versions in the `requirements.txt` file.
 
 ## Requirements
 
-- Python 3.7+
-- PyTorch
+Our code was tested on a Windows platform with the following hardware specifications:
+- **CPU**: Intel(R) Core(TM) i9-14900KF
+- **GPU**: NVIDIA GeForce RTX 4090 D
+- **CUDA version**: 11.8
+
+
+- Python 3.8+
+- PyTorch 2.1.0
 - NumPy
 - SciPy
 - tqdm
@@ -55,7 +58,11 @@ for downstream tasks such as clustering and classification.
 
 ## Example
 
-See https://github.com/StickTaTa/ScFormer/blob/main/01_cell_graph.ipynb
+The following files contain tutorials for different datasets:
+
+- [01_Tutorial_example.ipynb](https://github.com/StickTaTa/ScFormer/blob/main/01_Tutorial_example.ipynb) contains a simple example using simulated data, including 500 cells.
+- [02_Tutorial_Mouse_retina.ipynb](https://github.com/StickTaTa/ScFormer/blob/main/02_Tutorial_Mouse_retina.ipynb) contains an analysis of mouse retina data, including over 9,000 cells.
+- [03_Tutorial_Mouse_retina_.ipynb](https://github.com/StickTaTa/ScFormer/blob/main/03_Tutorial_Mouse_retina_.ipynb) contains further analysis of the mouse retina data.
 
 ## Contributing
 
