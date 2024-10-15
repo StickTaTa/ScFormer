@@ -450,20 +450,20 @@ class ScFormer(nn.Module):
                 self.gnn_optimizer.step()
                 # self.net_optimizer.step()  # 移除 Net 优化器
 
-        print('The training for the ScFormer model has been completed.')
+        print('The training for the scformer model has been completed.')
         return self.gnn, cell_emb, gene_emb, h_final  # 返回 h_final
 
     def train_model(self, indices, RNA_matrix, ini_p1):
         self.train()
-        print('The training process for the ScFormer model has started. Please wait.')
+        print('The training process for the scformer model has started. Please wait.')
         Mars_gnn, cell_emb, gene_emb, h_final = self.forward(indices, RNA_matrix, ini_p1)
-        print('The training for the ScFormer model has been completed.')
+        print('The training for the scformer model has been completed.')
         return Mars_gnn, cell_emb, gene_emb, h_final
 
 
 def ScFormer_pred(RNA_matrix, gnn, indices, nodes_id, device, cell_size=30):
     """
-    使用训练好的 ScFormer 模型进行预测。
+    使用训练好的 scformer 模型进行预测。
 
     :param RNA_matrix: 基因表达矩阵 (scipy.sparse 或类似格式)
     :param gnn: 训练好的 ScFormer模型

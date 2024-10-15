@@ -29,7 +29,7 @@ for downstream tasks such as clustering and classification.
 1. **Clone the Repository**
     ```bash
     git clone https://github.com/StickTaTa/ScFormer.git
-    cd ScFormer
+    cd scformer
     ```
 
 2. **Create a Virtual Environment (Optional but Recommended)**
