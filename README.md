@@ -14,7 +14,7 @@
 
 **ScFormer** is a Multimodal Graph Transformer designed for single-cell data analysis. It leverages gene expression (RNA)
 data to construct and train graph neural networks (GNNs) that capture the intricate relationships between genes and
-cells. By focusing solely on RNA matrices, MarsGT simplifies the modeling process while maintaining robust performance
+cells. By focusing solely on RNA matrices, ScFormer simplifies the modeling process while maintaining robust performance
 for downstream tasks such as clustering and classification.
 
 ## Features
