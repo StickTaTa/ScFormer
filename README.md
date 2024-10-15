@@ -1,4 +1,4 @@
-# MarsGT: Multimodal Graph Transformer for Single-Cell Data
+# ScFormer
 
 ## Table of Contents
 
@@ -12,7 +12,7 @@
 
 ## Introduction
 
-**MarsGT** is a Multimodal Graph Transformer designed for single-cell data analysis. It leverages gene expression (RNA)
+**ScFormer** is a Multimodal Graph Transformer designed for single-cell data analysis. It leverages gene expression (RNA)
 data to construct and train graph neural networks (GNNs) that capture the intricate relationships between genes and
 cells. By focusing solely on RNA matrices, MarsGT simplifies the modeling process while maintaining robust performance
 for downstream tasks such as clustering and classification.
@@ -29,7 +29,7 @@ for downstream tasks such as clustering and classification.
 1. **Clone the Repository**
     ```bash
     git clone https://github.com/StickTaTa/ScFormer.git
-    cd MarsGT
+    cd ScFormer
     ```
 
 2. **Create a Virtual Environment (Optional but Recommended)**
