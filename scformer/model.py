@@ -328,6 +328,10 @@ class NodeDimensionReduction(nn.Module):
         print('The training for the NodeDimensionReduction model has been completed.')
         return self.gnn, cell_emb, gene_emb, h_final  # 返回 h_final
 
+    def save_model(self, file_path):
+        """保存训练好的模型"""
+        torch.save(self.gnn.state_dict(), file_path)
+
 
 class ScFormer(nn.Module):
     def __init__(self, gnn, h, labsm, n_hid, n_batch, device, lr, wd, num_epochs=1):
@@ -459,6 +463,10 @@ class ScFormer(nn.Module):
         Mars_gnn, cell_emb, gene_emb, h_final = self.forward(indices, RNA_matrix, ini_p1)
         print('The training for the scformer model has been completed.')
         return Mars_gnn, cell_emb, gene_emb, h_final
+
+    def save_model(self, file_path):
+        """保存训练好的模型"""
+        torch.save(self.gnn.state_dict(), file_path)
 
 
 def ScFormer_pred(RNA_matrix, gnn, indices, nodes_id, device, cell_size=30):
