@@ -9,6 +9,9 @@ import math
 import scanpy as sc
 from sklearn.metrics import accuracy_score
 from sklearn.metrics.cluster import normalized_mutual_info_score
+from joblib import Parallel, delayed, cpu_count
+import pickle
+import os
 
 
 def subgraph(graph, seed, n_neighbors, node_sele_prob):
@@ -47,10 +50,7 @@ def subgraph(graph, seed, n_neighbors, node_sele_prob):
 
         # Select neighbors without replacement based on probabilities
         selected_neighbors = np.random.choice(
-            neighbors,
-            size=n_neighbors_real,
-            replace=False,
-            p=neighbors_prob
+            neighbors, size=n_neighbors_real, replace=False, p=neighbors_prob
         )
 
         # Update the sets of picked and last layer nodes
@@ -62,114 +62,97 @@ def subgraph(graph, seed, n_neighbors, node_sele_prob):
     return indices
 
 
-def batch_select_whole(RNA_matrix, neighbor=[20], cell_size=30):
+def batch_select_whole(
+        RNA_matrix, neighbor=[20], cell_size=30, save_path="processed_data_subset"
+):
     """
-    Partitions the RNA matrix into batches and selects subgraphs for each cell.
-
-    Parameters:
-    - RNA_matrix (scipy.sparse matrix): Gene expression matrix (genes x cells).
-    - neighbor (list of int): Number of neighbors to select at each layer.
-    - cell_size (int): Number of cells per batch.
-
-    Returns:
-    - indices_ss (list of dict): List containing gene and cell indices for each batch.
-    - node_ids (np.array): Array of shuffled cell IDs.
-    - dic (dict): Dictionary mapping each cell to its selected gene indices.
+    修改后的函数，支持数据的保存和并行处理。
     """
-    print('Partitioning the data into batches. Please wait...')
+    # 检查是否已经存在处理后的数据
+    indices_ss_file = os.path.join(save_path, "indices_ss.pkl")
+    Node_Ids_file = os.path.join(save_path, "Node_Ids.pkl")
+    dic_file = os.path.join(save_path, "dic.pkl")
 
-    # Shuffle cell IDs
-    node_ids = np.random.choice(RNA_matrix.shape[1], size=RNA_matrix.shape[1], replace=False)
-    n_batch = math.ceil(node_ids.shape[0] / cell_size)
-    indices_ss = []
+    if (
+            os.path.exists(indices_ss_file)
+            and os.path.exists(Node_Ids_file)
+            and os.path.exists(dic_file)
+    ):
+        print("正在从磁盘加载处理后的数据...")
+        with open(indices_ss_file, "rb") as f:
+            indices_ss = pickle.load(f)
+        with open(Node_Ids_file, "rb") as f:
+            Node_Ids = pickle.load(f)
+        with open(dic_file, "rb") as f:
+            dic = pickle.load(f)
+    else:
+        print("正在将数据划分为批次并进行并行处理。请稍候...")
 
-    RNA_matrix = RNA_matrix.tocsr()  # Ensure efficient row slicing
-    dic = {}
+        # 打乱细胞 ID
+        Node_Ids = np.random.choice(
+            RNA_matrix.shape[1], size=RNA_matrix.shape[1], replace=False
+        )
+        n_batch = math.ceil(Node_Ids.shape[0] / cell_size)
+        indices_ss = []
 
-    for i in tqdm(range(n_batch), desc="Processing Batches"):
-        gene_indices_all = []
-        cell_indices_all = []
+        RNA_matrix = RNA_matrix.tocsr()  # 确保行切片效率高
+        dic = {}
 
-        # Determine the range for the current batch
-        start_idx = i * cell_size
-        end_idx = min((i + 1) * cell_size, node_ids.shape[0])
-        batch_node_ids = node_ids[start_idx:end_idx]
+        for i in tqdm(range(n_batch), desc="处理批次"):
+            gene_indices_all = []
+            cell_indices_all = []
 
-        for node in batch_node_ids:
-            # Extract gene expression for the current cell
-            rna_expression = RNA_matrix[:, node].toarray().flatten()
-            rna_expression[rna_expression < 5] = 0  # Thresholding
+            # 确定当前批次的范围
+            start_idx = i * cell_size
+            end_idx = min((i + 1) * cell_size, Node_Ids.shape[0])
+            batch_node_ids = Node_Ids[start_idx:end_idx]
 
-            # Compute selection probabilities
-            selection_prob = np.log(rna_expression + 1)
-            selection_prob = np.squeeze(selection_prob)
+            # 并行处理每个节点
+            results = Parallel(n_jobs=max(1, cpu_count() // 2))(
+                delayed(process_node)(node, RNA_matrix, neighbor)
+                for node in batch_node_ids
+            )
 
-            # Generate subgraph for the current cell
-            gene_indices = subgraph(RNA_matrix.transpose(), node, neighbor, selection_prob)
+            for node, gene_indices in results:
+                dic[node] = {"g": gene_indices}
+                gene_indices_all.extend(gene_indices)
 
-            # Update dictionaries and lists
-            dic[node] = {'g': gene_indices}
-            gene_indices_all.extend(gene_indices)
+            # 移除重复的基因索引
+            gene_indices_all = sorted(set(gene_indices_all))
 
-        # Remove duplicate gene indices
-        gene_indices_all = sorted(set(gene_indices_all))
+            # 准备批次字典
+            batch_dict = {
+                "gene_index": gene_indices_all,
+                "cell_index": list(batch_node_ids),
+            }
+            indices_ss.append(batch_dict)
 
-        # Prepare the batch dictionary
-        batch_dict = {
-            'gene_index': gene_indices_all,
-            'cell_index': list(batch_node_ids)
-        }
-        indices_ss.append(batch_dict)
+        # 保存处理后的数据
+        os.makedirs(save_path, exist_ok=True)
+        with open(indices_ss_file, "wb") as f:
+            pickle.dump(indices_ss, f)
+        with open(Node_Ids_file, "wb") as f:
+            pickle.dump(Node_Ids, f)
+        with open(dic_file, "wb") as f:
+            pickle.dump(dic, f)
 
-    return indices_ss, node_ids, dic
-
-
-# def batch_select_whole(RNA_matrix, ATAC_matrix, neighbor=[20], cell_size=30):
-#     print('We are currently in the process of partitioning the data into batches. Kindly wait for a moment, please.')
-#     node_ids = np.random.choice(RNA_matrix.shape[1], size=RNA_matrix.shape[1], replace=False)
-#     n_batch = math.ceil(node_ids.shape[0] / cell_size)
-#     indices_ss = []
-#
-#     RNA_matrix1 = RNA_matrix
-#     dic = {}
-#     for i in tqdm(range(n_batch)):
-#         gene_indices_all = []
-#         peak_indices_all = []
-#         if i < n_batch:
-#             node_range = node_ids[i * cell_size:(i + 1) * cell_size]
-#         else:
-#             node_range = node_ids[i * cell_size:]
-#
-#         for index, node in enumerate(node_range):
-#             rna_ = RNA_matrix1[:, node].todense()
-#             rna_[rna_ < 5] = 0
-#
-#             # Unified gene_indices computation
-#             gene_indices = subgraph(RNA_matrix.transpose(), node, neighbor, np.squeeze(np.array(np.log(rna_ + 1))))
-#
-#             peak_indices = subgraph(ATAC_matrix.transpose(), node, neighbor,
-#                                     np.squeeze(np.array(np.log(ATAC_matrix[:, node].todense() + 1))))
-#             dic[node] = {'g': gene_indices, 'p': peak_indices}
-#             gene_indices_all = gene_indices_all + gene_indices
-#             peak_indices_all = peak_indices_all + peak_indices
-#
-#         node_indices_all = node_range
-#         gene_indices_all = list(set(gene_indices_all))
-#         peak_indices_all = list(set(peak_indices_all))
-#
-#         h = {
-#             'gene_index': gene_indices_all,
-#             'peak_index': peak_indices_all,
-#             'cell_index': node_indices_all
-#         }
-#
-#         indices_ss.append(h)
-#
-#     return indices_ss, node_ids, dic
+    return indices_ss, Node_Ids, dic
 
 
-# def softmax(x):
-#     return (np.exp(x) / np.exp(x).sum())
+def process_node(node, RNA_matrix, neighbor):
+    # 提取当前细胞的基因表达
+    rna_expression = RNA_matrix[:, node].toarray().flatten()
+    rna_expression[rna_expression < 5] = 0  # 阈值处理
+
+    # 计算选择概率
+    selection_prob = np.log(rna_expression + 1)
+    selection_prob = np.squeeze(selection_prob)
+
+    # 为当前细胞生成子图
+    gene_indices = subgraph(RNA_matrix.transpose(), node, neighbor, selection_prob)
+
+    return node, gene_indices
+
 
 def softmax_stable(x):
     e_x = np.exp(x - np.max(x))
@@ -180,17 +163,17 @@ def softmax_simple(x):
     return np.exp(x) / np.exp(x).sum()
 
 
-class LabelSmoothing(nn.Module):
-    """NLL loss with label smoothing.
-    """
+class LabelSmoothing(torch.nn.Module):
+    """NLL loss with label smoothing."""
 
-    def __init__(self, smoothing=0.0):
+    def __init__(self, smoothing=0.0, num_classes=10):
         """Constructor for LabelSmoothing module.
         :param smoothing: Label smoothing factor
         """
         super(LabelSmoothing, self).__init__()
         self.confidence = 1.0 - smoothing
         self.smoothing = smoothing
+        # self.num_classes = num_classes
 
     def forward(self, x, target):
         logprobs = torch.nn.functional.log_softmax(x, dim=-1)
@@ -200,12 +183,22 @@ class LabelSmoothing(nn.Module):
         loss = self.confidence * nll_loss + self.smoothing * smooth_loss
         return loss.mean()
 
+    # def update_num_classes(self, new_num_classes):
+    #     self.num_classes = new_num_classes
 
-def initial_clustering(RNA_matrix, custom_n_neighbors=None, n_pcs=40, custom_resolution=None, use_rep=None):
+
+def initial_clustering(
+        RNA_matrix, custom_n_neighbors=None, n_pcs=40, custom_resolution=None, use_rep=None
+):
     print(
-        '\tWhen the number of cells is less than or equal to 500, it is recommended to set the resolution value to 0.2.')
-    print('\tWhen the number of cells is within the range of 500 to 5000, the resolution value should be set to 0.5.')
-    print('\tWhen the number of cells is greater than 5000, the resolution value should be set to 0.8.')
+        "\tWhen the number of cells is less than or equal to 500, it is recommended to set the resolution value to 0.2."
+    )
+    print(
+        "\tWhen the number of cells is within the range of 500 to 5000, the resolution value should be set to 0.5."
+    )
+    print(
+        "\tWhen the number of cells is greater than 5000, the resolution value should be set to 0.8."
+    )
 
     def segment_function(x):
         if x <= 500:
@@ -215,7 +208,7 @@ def initial_clustering(RNA_matrix, custom_n_neighbors=None, n_pcs=40, custom_res
         else:
             return 0.8, 15
 
-    adata = ad.AnnData(RNA_matrix.transpose(), dtype='int32')
+    adata = ad.AnnData(RNA_matrix.transpose(), dtype="int32")
 
     # If the user did not provide a custom resolution or n_neighbors value, use the values calculated by segment_function
     if custom_resolution is None or custom_n_neighbors is None:
@@ -229,13 +222,13 @@ def initial_clustering(RNA_matrix, custom_n_neighbors=None, n_pcs=40, custom_res
 
     # Use the user-provided embedding if available, otherwise use n_pcs
     if use_rep is not None:
-        adata.obsm['use_rep'] = use_rep
-        sc.pp.neighbors(adata, use_rep='use_rep', n_neighbors=n_neighbors)
+        adata.obsm["use_rep"] = use_rep
+        sc.pp.neighbors(adata, use_rep="use_rep", n_neighbors=n_neighbors)
     else:
         sc.pp.neighbors(adata, n_neighbors=n_neighbors, n_pcs=n_pcs)
 
     sc.tl.leiden(adata, resolution)
-    return adata.obs['leiden']
+    return adata.obs["leiden"]
 
 
 def purity_score(y_true, y_pred):
@@ -259,7 +252,7 @@ def purity_score(y_true, y_pred):
     ordered_labels = np.arange(labels.shape[0])
     for k in range(labels.shape[0]):
         y_true[y_true == labels[k]] = ordered_labels[k]
-    y_true = np.array(y_true, dtype='int64')
+    y_true = np.array(y_true, dtype="int64")
 
     # Update the unique labels
     labels = np.unique(y_true)
@@ -275,8 +268,8 @@ def purity_score(y_true, y_pred):
         winner = np.argmax(hist)
         y_voted_labels[y_pred == cluster] = winner
 
-    y_true = np.array(y_true, dtype='int8')
-    y_voted_labels = np.array(y_voted_labels, dtype='int8')
+    y_true = np.array(y_true, dtype="int8")
+    y_voted_labels = np.array(y_voted_labels, dtype="int8")
     return accuracy_score(y_true, y_voted_labels), y_true
 
 
