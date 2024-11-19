@@ -1,14 +1,15 @@
 import anndata as ad
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import pandas as pd
 import numpy as np
 from collections import Counter
 from tqdm import tqdm
 import math
 import scanpy as sc
 from sklearn.metrics import accuracy_score
-from sklearn.metrics.cluster import normalized_mutual_info_score
+from sklearn.metrics.cluster import normalized_mutual_info_score, adjusted_rand_score, silhouette_score, \
+    calinski_harabasz_score, davies_bouldin_score
+from sklearn.neighbors import NearestNeighbors
 from joblib import Parallel, delayed, cpu_count
 import pickle
 import os
@@ -287,3 +288,198 @@ def Entropy(pred_label, true_label):
                 en += np.log(p) * p
         e = e + en * pred_k / true_label.shape[0]
     return abs(e)
+
+
+def compute_lisi(data, labels, k=30):
+    """
+    Compute Local Inverse Simpson's Index (LISI) for each point to evaluate batch mixing.
+
+    Parameters:
+    data: numpy.ndarray or pandas.DataFrame
+        A 2D array with shape (n_samples, n_features) representing the high-dimensional data.
+    labels: list or numpy.ndarray
+        A list or array of batch labels corresponding to each sample.
+    k: int, optional (default=30)
+        Number of neighbors to consider for LISI calculation.
+
+    Returns:
+    lisi_scores: list
+        A list of LISI scores for each sample, representing the diversity of batches among neighbors.
+    """
+    # Convert data and labels into numpy arrays if they are not
+    if isinstance(data, pd.DataFrame):
+        data = data.values
+    labels = np.array(labels)
+
+    # Initialize nearest neighbors
+    nbrs = NearestNeighbors(n_neighbors=k + 1).fit(data)  # k+1 because the point itself is included
+    distances, indices = nbrs.kneighbors(data)
+
+    lisi_scores = []
+    for i in range(len(data)):
+        neighbor_labels = labels[indices[i][1:]]  # Ignore the point itself by selecting indices from 1 to k
+        label_counts = Counter(neighbor_labels)
+        total_count = sum(label_counts.values())
+        # Compute Simpson's index (sum of p_i^2) where p_i is the proportion of label i in the neighbors
+        simpson_index = sum((count / total_count) ** 2 for count in label_counts.values())
+        # Inverse Simpson's index
+        lisi = 1.0 / simpson_index
+        lisi_scores.append(lisi)
+
+    return lisi_scores
+
+
+def compute_ilisi(data, labels, k=30):
+    """
+    Compute Integrated Local Inverse Simpson's Index (iLISI) to evaluate overall batch mixing.
+
+    Parameters:
+    data: numpy.ndarray or pandas.DataFrame
+        A 2D array with shape (n_samples, n_features) representing the high-dimensional data.
+    labels: list or numpy.ndarray
+        A list or array of batch labels corresponding to each sample.
+    k: int, optional (default=30)
+        Number of neighbors to consider for iLISI calculation.
+
+    Returns:
+    ilisi_score: float
+        The mean iLISI score for the entire dataset, representing the average batch diversity among neighbors.
+    """
+    lisi_scores = compute_lisi(data, labels, k)
+    ilisi_score = np.mean(lisi_scores)
+    return ilisi_score
+
+
+def compute_nmi(true_labels, predicted_labels):
+    """
+    Compute Normalized Mutual Information (NMI).
+
+    Parameters:
+    true_labels: list or numpy.ndarray
+        True class labels for each sample.
+    predicted_labels: list or numpy.ndarray
+        Predicted class labels for each sample.
+
+    Returns:
+    nmi_score: float
+        The Normalized Mutual Information score.
+    """
+    nmi_score = normalized_mutual_info_score(true_labels, predicted_labels)
+    return nmi_score
+
+
+def compute_ari(true_labels, predicted_labels):
+    """
+    Compute Adjusted Rand Index (ARI).
+
+    Parameters:
+    true_labels: list or numpy.ndarray
+        True class labels for each sample.
+    predicted_labels: list or numpy.ndarray
+        Predicted class labels for each sample.
+
+    Returns:
+    ari_score: float
+        The Adjusted Rand Index score.
+    """
+    ari_score = adjusted_rand_score(true_labels, predicted_labels)
+    return ari_score
+
+
+def compute_nn_entropy(data, labels, k=30):
+    """
+    Compute Nearest-Neighbor Entropy (NN entropy) to evaluate batch mixing.
+
+    Parameters:
+    data: numpy.ndarray or pandas.DataFrame
+        A 2D array with shape (n_samples, n_features) representing the high-dimensional data.
+    labels: list or numpy.ndarray
+        A list or array of batch labels corresponding to each sample.
+    k: int, optional (default=30)
+        Number of neighbors to consider for NN entropy calculation.
+
+    Returns:
+    mean_nn_entropy: float
+        The mean NN entropy score for the entire dataset, representing the average entropy of batch labels among neighbors.
+    """
+    # Convert data and labels into numpy arrays if they are not
+    if isinstance(data, pd.DataFrame):
+        data = data.values
+    labels = np.array(labels)
+
+    # Initialize nearest neighbors
+    nbrs = NearestNeighbors(n_neighbors=k + 1).fit(data)  # k+1 because the point itself is included
+    distances, indices = nbrs.kneighbors(data)
+
+    nn_entropy_scores = []
+    for i in range(len(data)):
+        neighbor_labels = labels[indices[i][1:]]  # Ignore the point itself by selecting indices from 1 to k
+        label_counts = Counter(neighbor_labels)
+        total_count = sum(label_counts.values())
+        # Compute entropy (sum of -p_i * log(p_i)) where p_i is the proportion of label i in the neighbors
+        entropy = -sum(
+            (count / total_count) * math.log(count / total_count) for count in label_counts.values() if count > 0)
+        nn_entropy_scores.append(entropy)
+
+    mean_nn_entropy = np.mean(nn_entropy_scores)
+    return mean_nn_entropy
+
+
+def compute_silhouette_score(data, labels):
+    """
+    Compute Silhouette Coefficient to evaluate clustering quality.
+
+    Parameters:
+    data: numpy.ndarray or pandas.DataFrame
+        A 2D array with shape (n_samples, n_features) representing the high-dimensional data.
+    labels: list or numpy.ndarray
+        A list or array of cluster labels corresponding to each sample.
+
+    Returns:
+    silhouette: float
+        The mean Silhouette Coefficient for all samples.
+    """
+    if isinstance(data, pd.DataFrame):
+        data = data.values
+    silhouette = silhouette_score(data, labels)
+    return silhouette
+
+
+def compute_davies_bouldin_score(data, labels):
+    """
+    Compute Davies-Bouldin Index to evaluate clustering quality.
+
+    Parameters:
+    data: numpy.ndarray or pandas.DataFrame
+        A 2D array with shape (n_samples, n_features) representing the high-dimensional data.
+    labels: list or numpy.ndarray
+        A list or array of cluster labels corresponding to each sample.
+
+    Returns:
+    db_index: float
+        The Davies-Bouldin Index for the given clustering.
+    """
+    if isinstance(data, pd.DataFrame):
+        data = data.values
+    db_index = davies_bouldin_score(data, labels)
+    return db_index
+
+
+def compute_calinski_harabasz_score(data, labels):
+    """
+    Compute Calinski-Harabasz Index (CH Index) to evaluate clustering quality.
+
+    Parameters:
+    data: numpy.ndarray or pandas.DataFrame
+        A 2D array with shape (n_samples, n_features) representing the high-dimensional data.
+    labels: list or numpy.ndarray
+        A list or array of cluster labels corresponding to each sample.
+
+    Returns:
+    ch_index: float
+        The Calinski-Harabasz Index for the given clustering.
+    """
+    if isinstance(data, pd.DataFrame):
+        data = data.values
+    ch_index = calinski_harabasz_score(data, labels)
+    return ch_index

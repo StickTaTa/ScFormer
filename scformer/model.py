@@ -8,17 +8,17 @@ from sklearn.preprocessing import OneHotEncoder
 
 class GNN_from_raw(nn.Module):
     def __init__(
-        self,
-        in_dim,
-        n_hid,
-        num_types,
-        num_relations,
-        n_heads,
-        n_layers,
-        dropout=0.2,
-        conv_name="hgt",
-        prev_norm=True,
-        last_norm=True,
+            self,
+            in_dim,
+            n_hid,
+            num_types,
+            num_relations,
+            n_heads,
+            n_layers,
+            dropout=0.2,
+            conv_name="hgt",
+            prev_norm=True,
+            last_norm=True,
     ):
         super(GNN_from_raw, self).__init__()
         self.gcs = nn.ModuleList()
@@ -107,21 +107,21 @@ class Net(nn.Module):
 
 class NDR_1(nn.Module):
     def __init__(
-        self,
-        RNA_matrix,
-        indices,
-        ini_p1,
-        n_hid,
-        n_heads,
-        n_layers,
-        labsm,
-        lr,
-        wd,
-        device,
-        num_types=2,
-        num_relations=2,
-        epochs=1,
-        loss_contrastive_weight=0.001,
+            self,
+            RNA_matrix,
+            indices,
+            ini_p1,
+            n_hid,
+            n_heads,
+            n_layers,
+            labsm,
+            lr,
+            wd,
+            device,
+            num_types=2,
+            num_relations=2,
+            epochs=1,
+            loss_contrastive_weight=0.001,
     ):
         super(NDR_1, self).__init__()
         self.RNA_matrix = RNA_matrix
@@ -166,7 +166,7 @@ class NDR_1(nn.Module):
         )
 
     def supervised_contrastive_loss(
-        self, features, labels, batch_labels=None, temperature=0.07
+            self, features, labels, batch_labels=None, temperature=0.07
     ):
         """
         Compute supervised contrastive loss with batch labels.
@@ -228,8 +228,8 @@ class NDR_1(nn.Module):
         mean_log_prob_pos = torch.zeros_like(mask_sum)
         non_zero_mask = mask_sum > 0
         mean_log_prob_pos[non_zero_mask] = (
-            (mask * log_prob).sum(1)[non_zero_mask]
-        ) / mask_sum[non_zero_mask]
+                                               (mask * log_prob).sum(1)[non_zero_mask]
+                                           ) / mask_sum[non_zero_mask]
 
         # Loss
         loss = -mean_log_prob_pos
@@ -278,8 +278,8 @@ class NDR_1(nn.Module):
 
                 # 构建基因-细胞子图的邻接矩阵
                 gene_cell_sub = self.RNA_matrix[list(gene_index), :][
-                    :, list(cell_index)
-                ]
+                                :, list(cell_index)
+                                ]
 
                 # 构建基因到细胞的边索引
                 gene_to_cell_src = list(
@@ -382,10 +382,10 @@ class NDR_1(nn.Module):
 
                 # 总损失
                 loss = (
-                    loss_cluster
-                    + loss_kl
-                    + self.loss_contrastive_weight * loss_contrastive
-                    - lll
+                        loss_cluster
+                        + loss_kl
+                        + self.loss_contrastive_weight * loss_contrastive
+                        - lll
                 )
                 # loss = loss_cluster + loss_kl - lll
 
@@ -534,148 +534,24 @@ def ScFormer_pred(RNA_matrix, gnn, indices, device):
     ScFormer_result = {"pred_label": cell_clu, "cell_embedding": cell_embedding}
     return ScFormer_result
 
-    """
-    使用训练好的 scformer 模型进行预测。
-
-    :param RNA_matrix: 基因表达矩阵 (scipy.sparse 或类似格式)
-    :param gnn: 训练好的 ScFormer模型
-    :param indices: 批次索引列表，每个元素包含 'gene_index' 和 'cell_index'
-    :param device: 计算设备 (e.g., torch.device('cuda') 或 torch.device('cpu'))
-    :param gene_names: 基因名称列表
-    :return: 包含预测标签、细胞嵌入以及（如果需要）EGRN 结果的字典
-    """
-    # n_batch = math.ceil(nodes_id.shape[0] / cell_size)
-    n_batch = len(indices)
-
-    RNA_matrix_adata = sc.AnnData(RNA_matrix)
-    RNA_matrix_adata.raw = RNA_matrix_adata.copy()
-    sc.pp.normalize_total(RNA_matrix_adata, target_sum=1e4)
-    sc.pp.log1p(RNA_matrix_adata)
-    sc.pp.scale(RNA_matrix_adata, zero_center=True)
-    RNA_matrix_adata.X = csr_matrix(RNA_matrix_adata.X)
-
-    RNA_matrix_gene = RNA_matrix_adata.raw.X.T
-    RNA_matrix_cell = RNA_matrix_adata.X.T
-
-    embedding = []
-    l_pre = []
-    ScFormer_result = {}
-    with torch.no_grad():
-        for batch_id in tqdm(range(n_batch), desc="Prediction Batches"):
-            gene_index = indices[batch_id]["cell_index"]
-            cell_index = indices[batch_id]["gene_index"]
-            # peak_index = indices[batch_id]['peak_index']  # 移除峰值索引
-
-            # 提取基因和细胞的特征
-            gene_feature = RNA_matrix_gene[list(gene_index), :]
-            cell_feature = RNA_matrix_cell[:, list(cell_index)].T
-
-            # 转换为张量并移动到设备上
-            gene_feature = torch.tensor(gene_feature.todense(), dtype=torch.float32).to(
-                device
-            )
-            cell_feature = torch.tensor(cell_feature.todense(), dtype=torch.float32).to(
-                device
-            )
-
-            # 构建节点特征列表（细胞和基因）
-            node_feature = [cell_feature, gene_feature]
-
-            # 构建基因-细胞子图的邻接矩阵
-            gene_cell_sub = RNA_matrix_gene[list(gene_index), :][:, list(cell_index)]
-
-            # 构建基因到细胞的边索引
-            gene_to_cell_src = list(np.nonzero(gene_cell_sub)[0] + len(cell_index))
-            gene_to_cell_dst = list(np.nonzero(gene_cell_sub)[1])
-
-            # 构建细胞到基因的边索引
-            cell_to_gene_src = list(np.nonzero(gene_cell_sub)[1])
-            cell_to_gene_dst = list(np.nonzero(gene_cell_sub)[0] + len(cell_index))
-
-            # 合并边索引
-            edge_index = torch.LongTensor(
-                [
-                    gene_to_cell_src + cell_to_gene_src,
-                    gene_to_cell_dst + cell_to_gene_dst,
-                ]
-            ).to(device)
-
-            # 定义节点类型：0 代表细胞，1 代表基因
-            node_type = torch.LongTensor(
-                np.array(
-                    list(np.zeros(len(cell_index))) + list(np.ones(len(gene_index)))
-                )
-            ).to(device)
-
-            # 定义边类型：0 代表基因到细胞，1 代表细胞到基因
-            edge_type_gene_to_cell = np.zeros(len(gene_to_cell_src), dtype=int)
-            edge_type_cell_to_gene = np.ones(len(cell_to_gene_src), dtype=int)
-            edge_type = torch.LongTensor(
-                np.concatenate([edge_type_gene_to_cell, edge_type_cell_to_gene])
-            ).to(device)
-
-            # 获取标签
-            # l = torch.LongTensor(np.array(nodes_id)[cell_index]).to(device)
-
-            # 前向传播
-            node_rep = gnn.forward(node_feature, node_type, edge_index, edge_type).to(
-                device
-            )
-            cell_emb = node_rep[node_type == 0]
-            gene_emb = node_rep[node_type == 1]
-            # peak_emb = node_rep[node_type == 2]  # 移除峰值嵌入
-
-            # 解码器：基因与细胞的关系
-            decoder_gene_to_cell = torch.mm(gene_emb, cell_emb.t())
-
-            # 构建目标矩阵
-            gene_cell_sub_tensor = torch.tensor(
-                gene_cell_sub.todense(), dtype=torch.float32
-            ).to(device)
-
-            # 计算基因到细胞的 KL 散度损失
-            logp_x1 = F.log_softmax(decoder_gene_to_cell, dim=-1)
-            p_y1 = F.softmax(gene_cell_sub_tensor, dim=-1)
-            loss_kl1 = F.kl_div(logp_x1, p_y1, reduction="mean")
-
-            # 总的 KL 散度损失 (只包括基因-细胞)
-            loss_kl = loss_kl1
-
-            # 聚类损失（如果需要）
-            # 由于在预测阶段通常不需要计算损失，可以选择移除或保留根据需求
-            # 这里只保留嵌入和预测标签
-
-            # 取 cell_emb 的嵌入作为输出
-            embedding.append(cell_emb.cpu().numpy())
-
-            # 预测标签为 cell_emb 的某个维度的最大值 (假设分类任务)
-            cell_pre = list(cell_emb.argmax(dim=1).detach().cpu().numpy())
-            l_pre.extend(cell_pre)
-
-    cell_embedding = np.vstack(embedding)
-    cell_clu = np.array(l_pre)
-
-    ScFormer_result = {"pred_label": cell_clu, "cell_embedding": cell_embedding}
-    return ScFormer_result
-
 
 class NDR_2(nn.Module):
     def __init__(
-        self,
-        RNA_matrix,
-        indices,
-        ini_p1,
-        n_hid,
-        n_heads,
-        n_layers,
-        labsm,
-        lr,
-        wd,
-        device,
-        batch_source,
-        num_types=2,
-        num_relations=2,
-        epochs=1,
+            self,
+            RNA_matrix,
+            indices,
+            ini_p1,
+            n_hid,
+            n_heads,
+            n_layers,
+            labsm,
+            lr,
+            wd,
+            device,
+            batch_source,
+            num_types=2,
+            num_relations=2,
+            epochs=1,
     ):
         super(NDR_2, self).__init__()
         self.RNA_matrix = RNA_matrix
@@ -774,7 +650,7 @@ class NDR_2(nn.Module):
         # 计算局部结构保持损失
         neighbor_k = min(15, cell_emb.size(0) - 1)  # 取最近的k个邻居
         dist_sorted, _ = torch.sort(cell_dist, dim=1)
-        neighbor_dist = dist_sorted[:, 1 : neighbor_k + 1]  # 排除自身
+        neighbor_dist = dist_sorted[:, 1: neighbor_k + 1]  # 排除自身
         structure_loss = torch.mean(neighbor_dist)
 
         return distribution_loss + 0.5 * structure_loss
@@ -815,8 +691,8 @@ class NDR_2(nn.Module):
 
                 # 构建基因-细胞子图的邻接矩阵
                 gene_cell_sub = self.RNA_matrix[list(gene_index), :][
-                    :, list(cell_index)
-                ]
+                                :, list(cell_index)
+                                ]
 
                 # 构建基因到细胞的边索引
                 gene_to_cell_src = list(
