@@ -536,6 +536,27 @@ def ScFormer_pred(RNA_matrix, gnn, indices, device):
 
 
 class NDR_2(nn.Module):
+    """
+        Node Dimension Reduction Model with optional batch correction.
+
+        Args:
+            RNA_matrix (np.ndarray): 输入的RNA表达矩阵。
+            indices (list): 批次索引信息。
+            ini_p1 (list): 初始标签信息。
+            n_hid (int): 隐藏层维度。
+            n_heads (int): 注意力头数量。
+            n_layers (int): GNN层数。
+            labsm (float): 标签平滑参数。
+            lr (float): 学习率。
+            wd (float): 权重衰减。
+            device (torch.device): 计算设备。
+            enable_batch_correction (bool, optional): 是否启用批次矫正。默认值为False。
+            batch_source (list, optional): 批次来源信息。启用批次矫正时必须提供。
+            num_types (int, optional): 节点类型数量。默认值为2。
+            num_relations (int, optional): 关系类型数量。默认值为2。
+            epochs (int, optional): 训练轮数。默认值为1。
+        """
+
     def __init__(
             self,
             RNA_matrix,
@@ -548,7 +569,8 @@ class NDR_2(nn.Module):
             lr,
             wd,
             device,
-            batch_source,
+            enable_batch_correction=False,
+            batch_source=None,
             num_types=2,
             num_relations=2,
             epochs=1,
@@ -572,13 +594,22 @@ class NDR_2(nn.Module):
         self.device = device
         self.epochs = epochs
 
-        # 记录批次信息
+        self.enable_batch_correction = enable_batch_correction
         self.batch_source = batch_source
-        self.batch_encoder = OneHotEncoder(sparse=False)
-        self.batch_onehot = self.batch_encoder.fit_transform(
-            np.array(batch_source).reshape(-1, 1)
-        )
-        self.n_batches = len(np.unique(batch_source))
+
+        if self.enable_batch_correction:
+            if self.batch_source is None:
+                raise ValueError('batch_source must be provided when enable_batch_correction is True.')
+
+            self.batch_encoder = OneHotEncoder(sparse=False)
+            self.batch_onehot = self.batch_encoder.fit_transform(
+                np.array(self.batch_source).reshape(-1, 1)
+            )
+            self.n_batches = len(np.unique(self.batch_source))
+        else:
+            self.batch_encoder = None
+            self.batch_onehot = None
+            self.n_batches = None
 
         # 标签平滑
         self.LabSm = LabelSmoothing(self.labsm)
@@ -655,13 +686,10 @@ class NDR_2(nn.Module):
 
         return distribution_loss + 0.5 * structure_loss
 
-    def train_model(self, n_batch, batch_labels_list=None):
+    def train_model(self, n_batch):
         """
         Args:
             n_batch: number of batches
-            Node_Ids: array of Node IDs in the current order
-            mapping: array indicating the mapping to original order (if shuffled)
-            batch_labels_list: (optional) a list where each element is a tensor of batch labels for the cells in that batch
         """
         print(
             "The training process for the NodeDimensionReduction model has started. Please wait."
@@ -778,10 +806,12 @@ class NDR_2(nn.Module):
                         lll += similarity.mean()
                         h_final = h  # 更新 h_final 为当前标签的 h
 
-                batch_correction_loss = self.calculate_batch_loss(cell_emb, cell_index)
-
-                # 总损失
-                loss = loss_cluster + loss_kl - lll + 0.5 * batch_correction_loss
+                # 计算总损失
+                if self.enable_batch_correction:
+                    batch_correction_loss = self.calculate_batch_loss(cell_emb, cell_index)
+                    loss = loss_cluster + loss_kl - lll + 0.5 * batch_correction_loss
+                else:
+                    loss = loss_cluster + loss_kl - lll
 
                 # 反向传播和优化
                 self.optimizer.zero_grad()
