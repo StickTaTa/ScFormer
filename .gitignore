@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+/cache
+/benchmark/GiniClust2
+/benchmark/GiniClust2.R
+/benchmark/GapClust
+/data
+/output
+/Tutorial/processed_data_subset
+/benchmark/results
