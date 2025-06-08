@@ -6,9 +6,15 @@ from collections import Counter
 from tqdm import tqdm
 import math
 import scanpy as sc
+from scipy.sparse import issparse, csr_matrix
 from sklearn.metrics import accuracy_score
-from sklearn.metrics.cluster import normalized_mutual_info_score, adjusted_rand_score, silhouette_score, \
-    calinski_harabasz_score, davies_bouldin_score
+from sklearn.metrics.cluster import (
+    normalized_mutual_info_score,
+    adjusted_rand_score,
+    silhouette_score,
+    calinski_harabasz_score,
+    davies_bouldin_score,
+)
 from sklearn.neighbors import NearestNeighbors
 from joblib import Parallel, delayed, cpu_count
 import pickle
@@ -64,7 +70,7 @@ def subgraph(graph, seed, n_neighbors, node_sele_prob):
 
 
 def batch_select_whole(
-        RNA_matrix, neighbor=[20], cell_size=30, save_path="processed_data_subset"
+    RNA_matrix, neighbor=[20], cell_size=30, save_path="processed_data_subset"
 ):
     """
     修改后的函数，支持数据的保存和并行处理。
@@ -75,9 +81,9 @@ def batch_select_whole(
     dic_file = os.path.join(save_path, "dic.pkl")
 
     if (
-            os.path.exists(indices_ss_file)
-            and os.path.exists(Node_Ids_file)
-            and os.path.exists(dic_file)
+        os.path.exists(indices_ss_file)
+        and os.path.exists(Node_Ids_file)
+        and os.path.exists(dic_file)
     ):
         print("正在从磁盘加载处理后的数据...")
         with open(indices_ss_file, "rb") as f:
@@ -96,7 +102,11 @@ def batch_select_whole(
         n_batch = math.ceil(Node_Ids.shape[0] / cell_size)
         indices_ss = []
 
-        RNA_matrix = RNA_matrix.tocsr()  # 确保行切片效率高
+        if issparse(RNA_matrix):
+            RNA_matrix = RNA_matrix.tocsr()  # 确保行切片效率高
+        else:
+            RNA_matrix = csr_matrix(RNA_matrix)
+
         dic = {}
 
         for i in tqdm(range(n_batch), desc="处理批次"):
@@ -109,7 +119,11 @@ def batch_select_whole(
             batch_node_ids = Node_Ids[start_idx:end_idx]
 
             # 并行处理每个节点
-            results = Parallel(n_jobs=max(1, cpu_count() // 2))(
+            # results = Parallel(n_jobs=max(1, cpu_count() // 2))(
+            #     delayed(process_node)(node, RNA_matrix, neighbor)
+            #     for node in batch_node_ids
+            # )
+            results = Parallel(n_jobs=1)(
                 delayed(process_node)(node, RNA_matrix, neighbor)
                 for node in batch_node_ids
             )
@@ -189,7 +203,7 @@ class LabelSmoothing(torch.nn.Module):
 
 
 def initial_clustering(
-        RNA_matrix, custom_n_neighbors=None, n_pcs=40, custom_resolution=None, use_rep=None
+    RNA_matrix, custom_n_neighbors=None, n_pcs=40, custom_resolution=None, use_rep=None
 ):
     print(
         "\tWhen the number of cells is less than or equal to 500, it is recommended to set the resolution value to 0.2."
@@ -209,7 +223,7 @@ def initial_clustering(
         else:
             return 0.8, 15
 
-    adata = ad.AnnData(RNA_matrix.transpose(), dtype="int32")
+    adata = ad.AnnData(RNA_matrix.transpose())
 
     # If the user did not provide a custom resolution or n_neighbors value, use the values calculated by segment_function
     if custom_resolution is None or custom_n_neighbors is None:
@@ -220,6 +234,8 @@ def initial_clustering(
 
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
+    sc.pp.scale(adata)
+    sc.tl.pca(adata, svd_solver="arpack")
 
     # Use the user-provided embedding if available, otherwise use n_pcs
     if use_rep is not None:
@@ -312,16 +328,22 @@ def compute_lisi(data, labels, k=30):
     labels = np.array(labels)
 
     # Initialize nearest neighbors
-    nbrs = NearestNeighbors(n_neighbors=k + 1).fit(data)  # k+1 because the point itself is included
+    nbrs = NearestNeighbors(n_neighbors=k + 1).fit(
+        data
+    )  # k+1 because the point itself is included
     distances, indices = nbrs.kneighbors(data)
 
     lisi_scores = []
     for i in range(len(data)):
-        neighbor_labels = labels[indices[i][1:]]  # Ignore the point itself by selecting indices from 1 to k
+        neighbor_labels = labels[
+            indices[i][1:]
+        ]  # Ignore the point itself by selecting indices from 1 to k
         label_counts = Counter(neighbor_labels)
         total_count = sum(label_counts.values())
         # Compute Simpson's index (sum of p_i^2) where p_i is the proportion of label i in the neighbors
-        simpson_index = sum((count / total_count) ** 2 for count in label_counts.values())
+        simpson_index = sum(
+            (count / total_count) ** 2 for count in label_counts.values()
+        )
         # Inverse Simpson's index
         lisi = 1.0 / simpson_index
         lisi_scores.append(lisi)
@@ -408,17 +430,24 @@ def compute_nn_entropy(data, labels, k=30):
     labels = np.array(labels)
 
     # Initialize nearest neighbors
-    nbrs = NearestNeighbors(n_neighbors=k + 1).fit(data)  # k+1 because the point itself is included
+    nbrs = NearestNeighbors(n_neighbors=k + 1).fit(
+        data
+    )  # k+1 because the point itself is included
     distances, indices = nbrs.kneighbors(data)
 
     nn_entropy_scores = []
     for i in range(len(data)):
-        neighbor_labels = labels[indices[i][1:]]  # Ignore the point itself by selecting indices from 1 to k
+        neighbor_labels = labels[
+            indices[i][1:]
+        ]  # Ignore the point itself by selecting indices from 1 to k
         label_counts = Counter(neighbor_labels)
         total_count = sum(label_counts.values())
         # Compute entropy (sum of -p_i * log(p_i)) where p_i is the proportion of label i in the neighbors
         entropy = -sum(
-            (count / total_count) * math.log(count / total_count) for count in label_counts.values() if count > 0)
+            (count / total_count) * math.log(count / total_count)
+            for count in label_counts.values()
+            if count > 0
+        )
         nn_entropy_scores.append(entropy)
 
     mean_nn_entropy = np.mean(nn_entropy_scores)

@@ -8,17 +8,17 @@ from sklearn.preprocessing import OneHotEncoder
 
 class GNN_from_raw(nn.Module):
     def __init__(
-            self,
-            in_dim,
-            n_hid,
-            num_types,
-            num_relations,
-            n_heads,
-            n_layers,
-            dropout=0.2,
-            conv_name="hgt",
-            prev_norm=True,
-            last_norm=True,
+        self,
+        in_dim,
+        n_hid,
+        num_types,
+        num_relations,
+        n_heads,
+        n_layers,
+        dropout=0.2,
+        conv_name="hgt",
+        prev_norm=True,
+        last_norm=True,
     ):
         super(GNN_from_raw, self).__init__()
         self.gcs = nn.ModuleList()
@@ -107,21 +107,21 @@ class Net(nn.Module):
 
 class NDR_1(nn.Module):
     def __init__(
-            self,
-            RNA_matrix,
-            indices,
-            ini_p1,
-            n_hid,
-            n_heads,
-            n_layers,
-            labsm,
-            lr,
-            wd,
-            device,
-            num_types=2,
-            num_relations=2,
-            epochs=1,
-            loss_contrastive_weight=0.001,
+        self,
+        RNA_matrix,
+        indices,
+        ini_p1,
+        n_hid,
+        n_heads,
+        n_layers,
+        labsm,
+        lr,
+        wd,
+        device,
+        num_types=2,
+        num_relations=2,
+        epochs=1,
+        loss_contrastive_weight=0.001,
     ):
         super(NDR_1, self).__init__()
         self.RNA_matrix = RNA_matrix
@@ -166,7 +166,7 @@ class NDR_1(nn.Module):
         )
 
     def supervised_contrastive_loss(
-            self, features, labels, batch_labels=None, temperature=0.07
+        self, features, labels, batch_labels=None, temperature=0.07
     ):
         """
         Compute supervised contrastive loss with batch labels.
@@ -228,8 +228,8 @@ class NDR_1(nn.Module):
         mean_log_prob_pos = torch.zeros_like(mask_sum)
         non_zero_mask = mask_sum > 0
         mean_log_prob_pos[non_zero_mask] = (
-                                               (mask * log_prob).sum(1)[non_zero_mask]
-                                           ) / mask_sum[non_zero_mask]
+            (mask * log_prob).sum(1)[non_zero_mask]
+        ) / mask_sum[non_zero_mask]
 
         # Loss
         loss = -mean_log_prob_pos
@@ -278,8 +278,8 @@ class NDR_1(nn.Module):
 
                 # 构建基因-细胞子图的邻接矩阵
                 gene_cell_sub = self.RNA_matrix[list(gene_index), :][
-                                :, list(cell_index)
-                                ]
+                    :, list(cell_index)
+                ]
 
                 # 构建基因到细胞的边索引
                 gene_to_cell_src = list(
@@ -382,10 +382,10 @@ class NDR_1(nn.Module):
 
                 # 总损失
                 loss = (
-                        loss_cluster
-                        + loss_kl
-                        + self.loss_contrastive_weight * loss_contrastive
-                        - lll
+                    loss_cluster
+                    + loss_kl
+                    + self.loss_contrastive_weight * loss_contrastive
+                    - lll
                 )
                 # loss = loss_cluster + loss_kl - lll
 
@@ -537,43 +537,43 @@ def ScFormer_pred(RNA_matrix, gnn, indices, device):
 
 class NDR_2(nn.Module):
     """
-        Node Dimension Reduction Model with optional batch correction.
+    Node Dimension Reduction Model with optional batch correction.
 
-        Args:
-            RNA_matrix (np.ndarray): 输入的RNA表达矩阵。
-            indices (list): 批次索引信息。
-            ini_p1 (list): 初始标签信息。
-            n_hid (int): 隐藏层维度。
-            n_heads (int): 注意力头数量。
-            n_layers (int): GNN层数。
-            labsm (float): 标签平滑参数。
-            lr (float): 学习率。
-            wd (float): 权重衰减。
-            device (torch.device): 计算设备。
-            enable_batch_correction (bool, optional): 是否启用批次矫正。默认值为False。
-            batch_source (list, optional): 批次来源信息。启用批次矫正时必须提供。
-            num_types (int, optional): 节点类型数量。默认值为2。
-            num_relations (int, optional): 关系类型数量。默认值为2。
-            epochs (int, optional): 训练轮数。默认值为1。
-        """
+    Args:
+        RNA_matrix (np.ndarray): 输入的RNA表达矩阵。
+        indices (list): 批次索引信息。
+        ini_p1 (list): 初始标签信息。
+        n_hid (int): 隐藏层维度。
+        n_heads (int): 注意力头数量。
+        n_layers (int): GNN层数。
+        labsm (float): 标签平滑参数。
+        lr (float): 学习率。
+        wd (float): 权重衰减。
+        device (torch.device): 计算设备。
+        enable_batch_correction (bool, optional): 是否启用批次矫正。默认值为False。
+        batch_source (list, optional): 批次来源信息。启用批次矫正时必须提供。
+        num_types (int, optional): 节点类型数量。默认值为2。
+        num_relations (int, optional): 关系类型数量。默认值为2。
+        epochs (int, optional): 训练轮数。默认值为1。
+    """
 
     def __init__(
-            self,
-            RNA_matrix,
-            indices,
-            ini_p1,
-            n_hid,
-            n_heads,
-            n_layers,
-            labsm,
-            lr,
-            wd,
-            device,
-            enable_batch_correction=False,
-            batch_source=None,
-            num_types=2,
-            num_relations=2,
-            epochs=1,
+        self,
+        RNA_matrix,
+        indices,
+        ini_p1,
+        n_hid,
+        n_heads,
+        n_layers,
+        labsm,
+        lr,
+        wd,
+        device,
+        enable_batch_correction=False,
+        batch_source=None,
+        num_types=2,
+        num_relations=2,
+        epochs=1,
     ):
         super(NDR_2, self).__init__()
         self.RNA_matrix = RNA_matrix
@@ -599,7 +599,9 @@ class NDR_2(nn.Module):
 
         if self.enable_batch_correction:
             if self.batch_source is None:
-                raise ValueError('batch_source must be provided when enable_batch_correction is True.')
+                raise ValueError(
+                    "batch_source must be provided when enable_batch_correction is True."
+                )
 
             self.batch_encoder = OneHotEncoder(sparse=False)
             self.batch_onehot = self.batch_encoder.fit_transform(
@@ -681,7 +683,7 @@ class NDR_2(nn.Module):
         # 计算局部结构保持损失
         neighbor_k = min(15, cell_emb.size(0) - 1)  # 取最近的k个邻居
         dist_sorted, _ = torch.sort(cell_dist, dim=1)
-        neighbor_dist = dist_sorted[:, 1: neighbor_k + 1]  # 排除自身
+        neighbor_dist = dist_sorted[:, 1 : neighbor_k + 1]  # 排除自身
         structure_loss = torch.mean(neighbor_dist)
 
         return distribution_loss + 0.5 * structure_loss
@@ -719,8 +721,8 @@ class NDR_2(nn.Module):
 
                 # 构建基因-细胞子图的邻接矩阵
                 gene_cell_sub = self.RNA_matrix[list(gene_index), :][
-                                :, list(cell_index)
-                                ]
+                    :, list(cell_index)
+                ]
 
                 # 构建基因到细胞的边索引
                 gene_to_cell_src = list(
@@ -808,7 +810,9 @@ class NDR_2(nn.Module):
 
                 # 计算总损失
                 if self.enable_batch_correction:
-                    batch_correction_loss = self.calculate_batch_loss(cell_emb, cell_index)
+                    batch_correction_loss = self.calculate_batch_loss(
+                        cell_emb, cell_index
+                    )
                     loss = loss_cluster + loss_kl - lll + 0.5 * batch_correction_loss
                 else:
                     loss = loss_cluster + loss_kl - lll
