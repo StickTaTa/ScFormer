@@ -58,11 +58,9 @@ Our code was tested on a Windows platform with the following hardware specificat
 
 ## Example
 
-The following files contain tutorials for different datasets:
+The following file contains a tutorial for the model:
 
-- [01_Tutorial_example.ipynb](https://github.com/StickTaTa/ScFormer/blob/main/01_Tutorial_example.ipynb) contains a simple example using simulated data, including 500 cells.
-- [02_Tutorial_Mouse_retina.ipynb](https://github.com/StickTaTa/ScFormer/blob/main/02_Tutorial_Mouse_retina.ipynb) contains an analysis of mouse retina data, including over 9,000 cells.
-- [03_Tutorial_Mouse_retina_.ipynb](https://github.com/StickTaTa/ScFormer/blob/main/03_Tutorial_Mouse_retina_.ipynb) contains further analysis of the mouse retina data.
+- [01_Tutorial_example.ipynb](https://github.com/StickTaTa/ScFormer/blob/main/Tutorial/01_Tutorial_example.ipynb) contains a simple example using simulated data, including 500 cells.
 
 ## Contributing
 
