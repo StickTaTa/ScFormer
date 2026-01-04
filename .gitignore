@@ -3,9 +3,20 @@
 .RData
 .Ruserdata
 /cache
-/benchmark/GiniClust2
-/benchmark/GiniClust2.R
-/benchmark/GapClust
+/benchmark
 /data
 /output
-/Tutorial/processed_data_subset
+/Script
+/Quantitative indicators
+/simulate_sc_data
+*.ipynb
+!/Tutorial/01_Tutorial_example.ipynb
+*.xlsx
+*.csv
+*.h5
+*.h5ad
+demo.py
+__pycache__/
+*.pyc
+.idea/
+.vscode/
