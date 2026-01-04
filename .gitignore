@@ -21,3 +21,4 @@ __pycache__/
 .idea/
 .vscode/
 /Script
+/scformer/utils__.py
