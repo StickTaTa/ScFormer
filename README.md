@@ -10,7 +10,6 @@
 - [Requirements](#requirements)
 - [Example](#example)
 - [Contributing](#contributing)
-- [License](#license)
 
 ## Introduction
 
