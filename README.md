@@ -1,4 +1,6 @@
-# ScFormer
+#  scFormer: A heterogeneous graph transformer-based method for rare cell identification in single-cell expression data
+
+![img.png](Fig/img.png)
 
 ## Table of Contents
 
@@ -12,10 +14,10 @@
 
 ## Introduction
 
-**ScFormer** is a Multimodal Graph Transformer designed for single-cell data analysis. It leverages gene expression (RNA)
-data to construct and train graph neural networks (GNNs) that capture the intricate relationships between genes and
-cells. By focusing solely on RNA matrices, ScFormer simplifies the modeling process while maintaining robust performance
-for downstream tasks such as clustering and classification.
+**ScFormer** is a graph-based computational framework designed to detect rare cell populations by encoding biological priors directly
+into the underlying topology. Rather than treating all expressed genes equivalently, scFormer is motivated by the premise that broadly
+expressed genes provide limited discriminatory power for resolving rare states. Instead, it prioritizes genes exhibiting high
+cell-specific expression, treating them as informative anchors for distinguishing rare populations.
 
 ## Features
 
@@ -65,7 +67,3 @@ The following file contains a tutorial for the model:
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
